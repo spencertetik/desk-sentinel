@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+*.db
+baseline.json
+fixtures/*.mp4
+.DS_Store

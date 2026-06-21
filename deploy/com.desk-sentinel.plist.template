@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Template LaunchAgent for always-on supervision.
+  Replace the __PLACEHOLDERS__ below with your own paths, then install per
+  deploy/README.md.  __INSTALL_DIR__ is the absolute path to this repo on your
+  machine; __HOME__ is your home directory (e.g. /Users/yourname).
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.desk-sentinel</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__INSTALL_DIR__/.venv/bin/python</string>
+        <string>-m</string>
+        <string>sentinel.app</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__INSTALL_DIR__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>15</integer>
+
+    <key>StandardOutPath</key>
+    <string>__HOME__/.desk-sentinel/desk-sentinel.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/.desk-sentinel/desk-sentinel.err.log</string>
+</dict>
+</plist>

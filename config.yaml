@@ -1,0 +1,86 @@
+stream:
+  # >>> SET THIS to your camera's RTSP URL. <<<
+  # Find it in your camera/NVR app (UniFi Protect, Reolink, Wyze RTSP, etc.).
+  # Examples:
+  #   rtsp://USERNAME:PASSWORD@192.168.1.50:554/stream1
+  #   rtsp://192.168.1.1:7447/<alias>          (UniFi Protect)
+  rtsp_url: rtsp://CHANGE_ME:554/stream
+  capture_fps: 15          # paces the processing loop (pose+overlay); reader drains at native rate
+  pose_downscale_width: 960
+thresholds:
+  forward_head_margin_deg: 12.0
+  trunk_margin_deg: 10.0
+  min_visibility: 0.5
+  head_drop_margin: 0.035  # head drop below calibrated neutral that = slouch/lean.
+                           # Recalibrate + tune to YOUR camera/feed (see README).
+server:
+  host: 127.0.0.1
+  port: 8088
+  stream_width: 960
+nudges:
+  enabled: true
+  break_after_seconds: 3600
+  poor_posture_seconds: 300
+  # Coach v2 — presence debounce + new event thresholds
+  debounce_seconds: 4
+  posture_slip_seconds: 90
+  good_streak_seconds: 1200
+  checkin_interval_seconds: 3600
+  # Work-hours window (fractional hours: 8.5 = 8:30am, 17.5 = 5:30pm)
+  work_start_hour: 8.5
+  work_end_hour: 17.5
+  speak_volume: 50
+  cooldown_seconds:
+    break_due: 600
+    poor_posture_sustained: 600
+    returned: 300
+    posture_slipping: 300
+    posture_good_streak: 1800
+    periodic_checkin: 3000
+    morning_arrival: 3600
+    wind_down: 3600
+  default_cooldown_seconds: 300
+  morning_brief:
+    enabled: true
+    after_hour: 5           # don't fire before 5am (avoids 3am bathroom trips)
+    include_weather: true
+    include_news: true
+    include_recap: true
+    weather_location: null  # null = IP-based geolocation
+    news_query: "artificial intelligence"
+    headline_count: 2
+  wind_down:
+    enabled: true
+    lead_minutes: 30        # fire 30 min before work_end_hour (i.e. at 5:00pm)
+db_path: ~/.desk-sentinel/desk_sentinel.db
+baseline_path: baseline.json
+backup:
+  enabled: true
+  dest_dir: ~/desk-sentinel-backups   # set to an external drive/NAS for off-machine backups
+  keep: 14
+  interval_hours: 24
+voice:
+  hotkey: "<cmd>+<alt>+d"
+  whisper_model: "base.en"
+  ollama_model: "llama3.1:8b"
+  ollama_url: "http://localhost:11434"
+  max_record_seconds: 15
+  silence_timeout: 1.2
+presence:
+  work_start_hour: 8.5
+  work_end_hour: 17.5
+  gap_merge_seconds: 20
+  min_session_seconds: 30
+  trend_days: 14
+  history_days: 30
+
+activity:
+  enabled: true
+  # Bottom-of-frame keyboard/desk region (normalised [x0, y0, x1, y1]).
+  # Controller: verify the green ROI box covers the keyboard area in the feed,
+  # then tune enter_threshold / exit_threshold against your live motion scores.
+  roi: [0.15, 0.78, 0.95, 1.0]
+  enter_threshold: 3.0   # ~0.4s-window motion: typing ~3.6 vs idle ~2.0 (see app sample interval)
+  exit_threshold: 2.3    # just above the idle floor so it returns to idle
+  idle_grace_seconds: 8  # seconds below exit before flipping to idle (absorbs short pauses)
+  ema_alpha: 0.3         # EMA smoothing factor

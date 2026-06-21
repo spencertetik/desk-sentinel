@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#090b0e" />
+  <title>Desk Sentinel</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div class="brand">
+        <svg class="brand-icon" width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="1" y="1" width="16" height="16" rx="4" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="9" cy="7" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M4 16c0-2.761 2.239-5 5-5s5 2.239 5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <h1>Desk Sentinel</h1>
+      </div>
+      <span id="health" class="badge">connecting…</span>
+    </header>
+
+    <section class="grid">
+      <div class="feed">
+        <img id="feed" src="/stream.mjpg" alt="live feed" />
+        <div class="feed-overlay">
+          <span class="feed-label">LIVE</span>
+        </div>
+      </div>
+
+      <aside class="stats">
+        <div class="status-card">
+          <span class="stats-eyebrow">Posture</span>
+          <div class="status" id="posture">—</div>
+          <div class="accent-bar" aria-hidden="true"></div>
+
+          <div class="activity-chip-wrap">
+            <span id="activity-chip" class="activity-chip" data-state="away">—</span>
+          </div>
+        </div>
+
+        <div class="gauge" aria-label="Forward head angle">
+          <label>Forward head</label>
+          <div class="gauge-value">
+            <span id="fh">—</span><span class="unit">°</span>
+          </div>
+        </div>
+
+        <div class="gauge" aria-label="Head drop below neutral">
+          <label>Head drop</label>
+          <div class="gauge-value">
+            <span id="head-drop">—</span>
+          </div>
+        </div>
+
+        <div class="gauge" aria-label="Time seated">
+          <label>Sitting</label>
+          <div class="gauge-value">
+            <span id="sitting">—</span><span class="unit">min</span>
+          </div>
+        </div>
+      </aside>
+    </section>
+
+    <section class="today">
+      <div class="today-header">
+        <span class="today-eyebrow">Today</span>
+      </div>
+      <div class="today-stats">
+        <div class="stat">
+          <span id="slouch-pct">—</span>
+          <label>slouch today</label>
+        </div>
+        <div class="stat">
+          <span id="breaks">—</span>
+          <label>breaks</label>
+        </div>
+        <div class="stat">
+          <span id="present-min">—</span>
+          <label>min at desk</label>
+        </div>
+      </div>
+      <ul id="timeline" class="timeline" aria-label="Today's activity timeline"></ul>
+    </section>
+
+    <!-- ── Presence Insights ────────────────────────────────────────── -->
+    <section class="insights">
+      <div class="insights-header">
+        <span class="insights-eyebrow">Presence Insights</span>
+      </div>
+
+      <!-- Today timeline + stats -->
+      <div class="ins-panel ins-panel--wide" id="ins-panel-today">
+        <div class="ins-panel-head">
+          <span class="ins-panel-title">Today's timeline</span>
+          <span class="ins-panel-meta" id="ins-today-meta">no tracked time yet</span>
+        </div>
+        <div class="ins-timeline-wrap" aria-label="Today's presence timeline, 0–24 h">
+          <div class="ins-timeline-axis" aria-hidden="true">
+            <span>12 am</span><span>6 am</span><span>12 pm</span>
+            <span>6 pm</span><span>12 am</span>
+          </div>
+          <svg id="ins-timeline-svg" class="ins-timeline-svg"
+               viewBox="0 0 720 32" xmlns="http://www.w3.org/2000/svg"
+               preserveAspectRatio="none" role="img" aria-label="Presence timeline">
+            <defs>
+              <pattern id="ins-hatch" x="0" y="0" width="6" height="6"
+                       patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <line x1="0" y1="0" x2="0" y2="6"
+                      stroke="rgba(255,255,255,0.07)" stroke-width="2"/>
+              </pattern>
+            </defs>
+          </svg>
+        </div>
+        <div class="ins-today-stats">
+          <div class="ins-stat">
+            <span id="ins-total">—</span>
+            <label>tracked desk time</label>
+          </div>
+          <div class="ins-stat">
+            <span id="ins-sessions">—</span>
+            <label>sessions</label>
+          </div>
+          <div class="ins-stat">
+            <span id="ins-first">—</span>
+            <label>first sit</label>
+          </div>
+          <div class="ins-stat">
+            <span id="ins-last">—</span>
+            <label>last leave</label>
+          </div>
+        </div>
+      </div>
+
+
+      <!-- Active-work breakdown -->
+      <div class="ins-panel ins-panel--wide" id="ins-panel-activity">
+        <div class="ins-panel-head">
+          <span class="ins-panel-title">Active vs Idle</span>
+          <span class="ins-panel-meta" id="ins-active-meta">today</span>
+        </div>
+        <div class="ins-active-bar-wrap" aria-label="Active vs idle proportion bar">
+          <div class="ins-active-bar" id="ins-active-bar">
+            <div class="ins-active-fill" id="ins-active-fill" style="width:0%"
+                 role="img" aria-label="Active portion"></div>
+          </div>
+        </div>
+        <div class="ins-active-stats">
+          <div class="ins-stat">
+            <span id="ins-active-sec">—</span>
+            <label>active</label>
+          </div>
+          <div class="ins-stat">
+            <span id="ins-idle-sec">—</span>
+            <label>idle at desk</label>
+          </div>
+          <div class="ins-stat ins-stat--highlight">
+            <span id="ins-active-share">—</span>
+            <label>active share</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="ins-row">
+        <!-- Time-of-day heatmap -->
+        <div class="ins-panel" id="ins-panel-heatmap">
+          <div class="ins-panel-head">
+            <span class="ins-panel-title">Typical hours</span>
+            <span class="ins-panel-meta">30-day history</span>
+          </div>
+          <div class="ins-heatmap-wrap"
+               aria-label="Presence heatmap by hour of day">
+            <svg id="ins-heatmap-svg" class="ins-heatmap-svg"
+                 viewBox="0 0 528 36" xmlns="http://www.w3.org/2000/svg"
+                 role="img" aria-label="Hour-of-day heatmap">
+              <!-- populated by JS -->
+            </svg>
+            <div class="ins-heatmap-axis" aria-hidden="true">
+              <span>12a</span><span>3a</span><span>6a</span><span>9a</span>
+              <span>12p</span><span>3p</span><span>6p</span><span>9p</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Work vs off-hours split -->
+        <div class="ins-panel" id="ins-panel-split">
+          <div class="ins-panel-head">
+            <span class="ins-panel-title">Work vs. off-hours</span>
+            <span class="ins-panel-meta">9 am – 5 pm</span>
+          </div>
+          <div class="ins-split-body">
+            <div class="ins-split-bar-wrap"
+                 aria-label="Work vs off-hours proportion bar">
+              <div class="ins-split-bar" id="ins-split-bar">
+                <div class="ins-split-work" id="ins-split-work-fill"
+                     style="width:0%" role="img"
+                     aria-label="Work hours portion"></div>
+              </div>
+            </div>
+            <div class="ins-split-stats">
+              <div class="ins-split-stat">
+                <span id="ins-work-hrs">—</span>
+                <label>work hrs</label>
+              </div>
+              <div class="ins-split-stat ins-split-stat--off">
+                <span id="ins-off-hrs">—</span>
+                <label>off hrs</label>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Multi-day trend -->
+      <div class="ins-panel ins-panel--wide" id="ins-panel-trend">
+        <div class="ins-panel-head">
+          <span class="ins-panel-title">14-day trend</span>
+          <span class="ins-panel-meta" id="ins-trend-meta">hours at desk per day</span>
+        </div>
+        <div class="ins-trend-wrap"
+             aria-label="Multi-day desk time trend chart">
+          <svg id="ins-trend-svg" class="ins-trend-svg"
+               viewBox="0 0 720 100" xmlns="http://www.w3.org/2000/svg"
+               role="img" aria-label="Daily desk hours bar chart">
+            <!-- populated by JS -->
+          </svg>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ── Talk Button ─────────────────────────────────────────────────── -->
+  <div id="ask-panel" class="ask-panel ask-panel--hidden" role="region" aria-label="Assistant answer" aria-live="polite">
+    <p class="ask-question" id="ask-question"></p>
+    <p class="ask-answer" id="ask-answer"></p>
+    <button class="ask-dismiss" id="ask-dismiss" aria-label="Dismiss answer">&#x2715;</button>
+  </div>
+
+  <button id="mic-btn" class="mic-btn" data-state="idle" aria-label="Ask Desk Sentinel">
+    <svg class="mic-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"
+         xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x="6.5" y="1" width="7" height="11" rx="3.5"
+            stroke="currentColor" stroke-width="1.5"/>
+      <path d="M3 10c0 3.866 3.134 7 7 7s7-3.134 7-7"
+            stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <line x1="10" y1="17" x2="10" y2="19.5"
+            stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <span class="mic-label" id="mic-label">Ask</span>
+  </button>
+
+  <script src="/app.js"></script>
+</body>
+</html>
