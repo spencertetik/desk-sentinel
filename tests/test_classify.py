@@ -39,6 +39,21 @@ def test_small_head_drop_stays_good():
     assert st.posture is Posture.GOOD
 
 
+def test_turning_with_raised_head_is_not_forward_head():
+    # Big shoulder->ear angle (turned to face a side laptop) BUT head is clearly
+    # higher than neutral -> it's a turn, not a slouch. Must stay GOOD.
+    raised = 0.30 - (THR.head_drop_margin + 0.03)  # ear well above baseline neutral
+    st = classify(_raw(40.0, 5.0, ear_y=raised), BASE, THR)
+    assert st.posture is Posture.GOOD
+    assert st.head_drop < 0
+
+
+def test_forward_head_still_flags_when_head_not_raised():
+    # Same big angle, but head at neutral height -> genuine forward head.
+    st = classify(_raw(40.0, 5.0, ear_y=0.30), BASE, THR)
+    assert st.posture is Posture.FORWARD_HEAD
+
+
 def test_head_drop_is_zero_without_baseline():
     st = classify(_raw(6.0, 5.0, ear_y=0.55), None, THR)
     assert st.head_drop == 0.0  # relative metric needs calibration

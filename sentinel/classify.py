@@ -44,7 +44,12 @@ def classify(raw: RawPosture, baseline: Baseline | None, thr: Thresholds) -> Sta
 
     if head_drop > thr.head_drop_margin:
         posture = Posture.SLOUCHING
-    elif raw.forward_head_deg > fh_limit:
+    elif raw.forward_head_deg > fh_limit and head_drop >= -thr.head_drop_margin:
+        # The shoulder->ear angle is a 2D projection: turning to face a side
+        # screen (e.g. a laptop) tilts that line sideways and spikes the angle
+        # without any real slouch. A genuine forward-head lean never *raises* the
+        # head above neutral, so if head_drop shows the head clearly higher than
+        # the calibrated neutral, treat the big angle as a turn, not bad posture.
         posture = Posture.FORWARD_HEAD
     else:
         posture = Posture.GOOD
