@@ -73,6 +73,14 @@ presence:
   min_session_seconds: 30
   trend_days: 14
   history_days: 30
+  # Only count someone as "present" when their shoulder is inside the zone where
+  # YOU actually sit — so a wide camera view ignores other furniture (e.g. an
+  # empty chair across the room, which the pose model can mistake for a person,
+  # especially at night under infrared). The zone is learned automatically when
+  # you run `--calibrate`. Leave seat_roi null to use the calibrated zone, or set
+  # it manually as normalised [x0, y0, x1, y1].
+  gate_enabled: true
+  seat_roi: null
 
 activity:
   enabled: true

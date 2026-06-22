@@ -101,6 +101,15 @@ upright). Sit up the way you'd like to sit, run `python -m sentinel.app
 strict or too loose, nudge `thresholds.head_drop_margin` in `config.yaml` (bigger
 = more forgiving) and re-run.
 
+Calibration also learns your **seat zone** — the part of the frame where you
+sit — and stores it in `baseline.json`. This matters when your camera sees more
+of the room than just your desk: without it, the pose model will happily track a
+*different* empty chair across the room as if someone were sitting there
+(especially at night under infrared), inflating your "present"/"sitting" time.
+With a seat zone, only a body where you actually sit counts as you. If you ever
+need to set it by hand, put `presence.seat_roi: [x0, y0, x1, y1]` (normalized
+0–1) in `config.yaml`; leave it `null` to use the calibrated zone.
+
 ---
 
 ## The voice agent (optional)

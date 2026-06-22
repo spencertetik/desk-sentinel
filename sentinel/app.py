@@ -138,6 +138,25 @@ def processing_loop(cap, pose, store, state, cfg, stop: threading.Event, engine,
     sit_start = None
     last_log = 0.0
 
+    # ── Seat-zone gate ────────────────────────────────────────────────────
+    # Resolve the zone the user actually sits in: an explicit config override
+    # wins, else the zone learned during --calibrate. Without one, the gate is
+    # off and any pose anywhere in the frame counts (legacy behavior).
+    seat_roi = None
+    if cfg.presence.gate_enabled:
+        if cfg.presence.seat_roi:
+            seat_roi = tuple(cfg.presence.seat_roi)
+        elif baseline is not None and baseline.seat_roi:
+            seat_roi = tuple(baseline.seat_roi)
+    if seat_roi:
+        log.info("Presence seat-zone gate active: %s", seat_roi)
+    else:
+        log.warning(
+            "Presence seat-zone gate OFF — no seat_roi configured or calibrated. "
+            "Recalibrate (python -m sentinel.app --calibrate) or set presence.seat_roi."
+        )
+    _prev_present = None
+
     # ── Activity detection state ──────────────────────────────────────────
     # prev_roi_gray: grayscale crop of the ORIGINAL frame (not pose-downscaled)
     # so that ROI pixel coordinates are consistent with cfg.activity.roi.
@@ -174,8 +193,17 @@ def processing_loop(cap, pose, store, state, cfg, stop: threading.Event, engine,
             pose_frame = frame
 
         lms = pose.estimate(pose_frame)
-        raw = compute_posture(lms, cfg.thresholds.min_visibility) if lms else _absent()
+        raw = compute_posture(lms, cfg.thresholds.min_visibility, seat_roi=seat_roi) if lms else _absent()
         status = classify(raw, baseline, cfg.thresholds)
+
+        # Log presence transitions (low-volume) so the gate is auditable: when
+        # someone appears we record where their shoulder sat in the frame.
+        if raw.present != _prev_present:
+            log.info(
+                "presence -> %s (shoulder_x=%.2f)",
+                "PRESENT" if raw.present else "absent", raw.shoulder_x,
+            )
+            _prev_present = raw.present
 
         now = time.time()
         sit_start, sitting = advance_sit_timer(sit_start, status.posture, now)
@@ -283,6 +311,11 @@ def classify_away():
 
 
 def main():
+    # Surface our own INFO logs (gate status, presence transitions) to the
+    # launchd log without enabling noisy third-party INFO output.
+    logging.basicConfig(level=logging.WARNING)
+    logging.getLogger("desk_sentinel").setLevel(logging.INFO)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config.yaml")
     parser.add_argument("--calibrate", action="store_true")

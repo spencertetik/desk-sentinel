@@ -18,6 +18,7 @@ class RawPosture:
     side: str                # 'left' | 'right' | 'none'
     ear_y: float = 0.0       # normalized vertical position of the used ear; head-drop vs neutral is the
                              # reliable seated lean/slouch signal (hips are not visible behind the desk)
+    shoulder_x: float = 0.0  # normalized horizontal position of the used shoulder (for the seat-zone gate)
 
 
 def angle_from_vertical(a: Landmark, b: Landmark) -> float:
@@ -34,7 +35,25 @@ def _side_visibility(pts, ear, shoulder, hip) -> float:
     return (pts[ear].visibility + pts[shoulder].visibility + pts[hip].visibility) / 3.0
 
 
-def compute_posture(pts: list[Landmark], min_visibility: float) -> RawPosture:
+def _in_roi(x: float, y: float, roi) -> bool:
+    x0, y0, x1, y1 = roi
+    return x0 <= x <= x1 and y0 <= y <= y1
+
+
+def compute_posture(
+    pts: list[Landmark],
+    min_visibility: float,
+    seat_roi: tuple[float, float, float, float] | None = None,
+) -> RawPosture:
+    """Reduce a set of pose landmarks to a posture reading.
+
+    ``seat_roi`` (normalized ``[x0, y0, x1, y1]``) is the region of the frame
+    where the user actually sits. When given, a detection whose chosen shoulder
+    falls outside this zone is treated as *absent* — this rejects pose
+    hallucinations on other furniture in a wide camera view (e.g. an empty chair
+    across the room, which MediaPipe readily "sees" as a person under
+    night-vision IR). When ``None``, any sufficiently-visible pose counts.
+    """
     left_vis = _side_visibility(pts, LEFT_EAR, LEFT_SHOULDER, LEFT_HIP)
     right_vis = _side_visibility(pts, RIGHT_EAR, RIGHT_SHOULDER, RIGHT_HIP)
 
@@ -46,13 +65,20 @@ def compute_posture(pts: list[Landmark], min_visibility: float) -> RawPosture:
     else:
         side, ear, shoulder, hip = "right", RIGHT_EAR, RIGHT_SHOULDER, RIGHT_HIP
 
+    sx, sy = pts[shoulder].x, pts[shoulder].y
+
+    # Spatial gate: only a body in the user's seat zone counts as present.
+    if seat_roi is not None and not _in_roi(sx, sy, seat_roi):
+        return RawPosture(0.0, 0.0, 0.0, present=False, side="none")
+
     forward_head = angle_from_vertical(pts[shoulder], pts[ear])
     trunk_lean = angle_from_vertical(pts[hip], pts[shoulder])
     return RawPosture(
         forward_head_deg=forward_head,
         trunk_lean_deg=trunk_lean,
-        shoulder_y=pts[shoulder].y,
+        shoulder_y=sy,
         present=True,
         side=side,
         ear_y=pts[ear].y,
+        shoulder_x=sx,
     )

@@ -82,6 +82,13 @@ class PresenceConfig(BaseModel):
     min_session_seconds: int = 30
     trend_days: int = 14
     history_days: int = 30
+    # Seat-zone gate: only count a person as "present" when their shoulder is
+    # inside the zone where you actually sit, so the camera ignores other
+    # furniture in view (an empty chair across the room, etc.).
+    gate_enabled: bool = True
+    # Manual override of the seat zone (normalized [x0, y0, x1, y1]). When null,
+    # the zone learned during `--calibrate` (stored in baseline.json) is used.
+    seat_roi: list[float] | None = None
 
 
 class VoiceConfig(BaseModel):
