@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import logging
 import subprocess
 import time
@@ -23,9 +22,22 @@ def speak_mac(message: str, volume: int | None) -> None:
 
 
 def notify_mac(title: str, message: str) -> None:
+    # Pass message/title as runtime arguments rather than interpolating them
+    # into the AppleScript source. Building the script with json.dumps emitted
+    # \uXXXX escapes for any non-ASCII character (curly quotes, emoji, etc.),
+    # which AppleScript rejects with a syntax error (-2741). argv avoids all
+    # string-escaping concerns.
     try:
-        script = f"display notification {json.dumps(message)} with title {json.dumps(title)}"
-        subprocess.run(["osascript", "-e", script], check=False, timeout=5)
+        subprocess.run(
+            [
+                "osascript",
+                "-e", "on run argv",
+                "-e", "display notification (item 1 of argv) with title (item 2 of argv)",
+                "-e", "end run",
+                message, title,
+            ],
+            check=False, timeout=5,
+        )
     except Exception as exc:  # non-fatal
         log.warning("notify failed: %s", exc)
 

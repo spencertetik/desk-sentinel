@@ -242,55 +242,67 @@ def processing_loop(cap, pose, store, state, cfg, stop: threading.Event, engine,
         annotated = draw_overlay(frame, lms, status, roi=roi_for_overlay)
         state.update(_encode(annotated, cfg.server.stream_width), status, cap.is_healthy(), sitting)
 
-        if now - last_log >= 1.0:  # downsample to ~1 Hz
-            store.add_sample(now, status)
-            last_log = now
-
-        for event in engine.update(status, now):
-            # Enrich message for stats-based events before storing/speaking
-            if event.type in ("returned", "periodic_checkin"):
-                t = time.localtime(now)
-                today_start = time.mktime(
-                    (t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, -1)
-                )
-                pq = store.posture_quality(since_ts=today_start)
-                summary = store.daily_summary(since_ts=today_start)
-                stats = {
-                    "desk_minutes": summary["present_samples"] // 60,
-                    "good_pct": pq["good_pct"] if pq["samples"] > 0 else None,
-                    "breaks": summary["breaks"],
-                }
-                event = Event(
-                    event.type, event.ts, compose_status_message(event.type, stats)
-                )
-                store.add_event(event)
-                if nudger is not None:
-                    nudger.dispatch(event, now)
-
-            elif event.type == "morning_arrival":
-                # Persistent once-per-day guard: the engine's guard is in-memory
-                # and resets on restart, so check the events table too.
-                if cfg.nudges.morning_brief.enabled and not _fired_today(store, now, "morning_arrival"):
-                    threading.Thread(
-                        target=_dispatch_morning_briefing,
-                        args=(store, cfg, nudger, now),
-                        daemon=True,
-                    ).start()
-
-            elif event.type == "wind_down":
-                if cfg.nudges.wind_down.enabled and not _fired_today(store, now, "wind_down"):
-                    message = compose_wind_down()
-                    wd_event = Event("wind_down", event.ts, message)
-                    store.add_event(wd_event)
-                    if nudger is not None:
-                        nudger.dispatch(wd_event, now)
-
-            else:
-                store.add_event(event)
-                if nudger is not None:
-                    nudger.dispatch(event, now)
+        # Persistence + coaching can raise (SQLite locks, osascript/`say`
+        # choking on an odd character, etc.). Isolate them so a transient
+        # failure logs and is skipped instead of killing the whole loop — the
+        # exact failure mode that used to freeze the dashboard.
+        try:
+            if now - last_log >= 1.0:  # downsample to ~1 Hz
+                store.add_sample(now, status)
+                last_log = now
+            _dispatch_events(engine.update(status, now), store, cfg, nudger, now)
+        except Exception:
+            log.exception("loop post-processing failed (continuing)")
 
         time.sleep(interval)
+
+
+def _dispatch_events(events, store, cfg, nudger, now: float) -> None:
+    """Persist and (where appropriate) speak coach events. Pulled out of the
+    processing loop so the loop can guard it with try/except."""
+    for event in events:
+        # Enrich message for stats-based events before storing/speaking
+        if event.type in ("returned", "periodic_checkin"):
+            t = time.localtime(now)
+            today_start = time.mktime(
+                (t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, -1)
+            )
+            pq = store.posture_quality(since_ts=today_start)
+            summary = store.daily_summary(since_ts=today_start)
+            stats = {
+                "desk_minutes": summary["present_samples"] // 60,
+                "good_pct": pq["good_pct"] if pq["samples"] > 0 else None,
+                "breaks": summary["breaks"],
+            }
+            event = Event(
+                event.type, event.ts, compose_status_message(event.type, stats)
+            )
+            store.add_event(event)
+            if nudger is not None:
+                nudger.dispatch(event, now)
+
+        elif event.type == "morning_arrival":
+            # Persistent once-per-day guard: the engine's guard is in-memory
+            # and resets on restart, so check the events table too.
+            if cfg.nudges.morning_brief.enabled and not _fired_today(store, now, "morning_arrival"):
+                threading.Thread(
+                    target=_dispatch_morning_briefing,
+                    args=(store, cfg, nudger, now),
+                    daemon=True,
+                ).start()
+
+        elif event.type == "wind_down":
+            if cfg.nudges.wind_down.enabled and not _fired_today(store, now, "wind_down"):
+                message = compose_wind_down()
+                wd_event = Event("wind_down", event.ts, message)
+                store.add_event(wd_event)
+                if nudger is not None:
+                    nudger.dispatch(wd_event, now)
+
+        else:
+            store.add_event(event)
+            if nudger is not None:
+                nudger.dispatch(event, now)
 
 
 def advance_sit_timer(sit_start, posture: Posture, now: float) -> tuple:
@@ -394,11 +406,18 @@ def main():
     # KeepAlive) restarts a clean process. KeepAlive only catches a *dead*
     # process, not a hung-but-serving one — this turns a wedge into an exit.
     # ------------------------------------------------------------------
-    def _capture_watchdog(grace: float = 45.0):
+    def _capture_watchdog(grace: float = 45.0, loop_grace: float = 30.0):
         while not stop.wait(10.0):
             age = cap.frame_age()
             if age > grace:
                 log.error("capture stale %.0fs (>%.0fs) — exiting for supervised restart", age, grace)
+                os._exit(1)
+            # A fresh capture thread is not enough: the processing loop itself
+            # can wedge (a hung pose call, etc.) while frames keep arriving and
+            # the server keeps reporting healthy. Watch the loop heartbeat too.
+            loop_age = state.loop_age()
+            if loop_age > loop_grace:
+                log.error("processing loop stalled %.0fs (>%.0fs) — exiting for supervised restart", loop_age, loop_grace)
                 os._exit(1)
 
     threading.Thread(target=_capture_watchdog, daemon=True).start()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import time
 
 from sentinel.classify import Posture, Status
 
@@ -14,6 +15,11 @@ class SharedState:
         self._status = Status(Posture.AWAY, 0.0, 0.0, 0.0)
         self._healthy = False
         self._sitting_seconds = 0.0
+        # Heartbeat: bumped every processing-loop iteration. The watchdog uses
+        # loop_age() to detect a wedged loop (the loop can stall even while the
+        # capture thread keeps producing fresh frames, so capture freshness
+        # alone is not enough to prove the app is actually working).
+        self._last_update_monotonic = time.monotonic()
 
     def update(self, jpeg: bytes, status: Status, healthy: bool, sitting_seconds: float):
         with self._lock:
@@ -21,6 +27,12 @@ class SharedState:
             self._status = status
             self._healthy = healthy
             self._sitting_seconds = sitting_seconds
+            self._last_update_monotonic = time.monotonic()
+
+    def loop_age(self) -> float:
+        """Seconds since the processing loop last completed an iteration."""
+        with self._lock:
+            return time.monotonic() - self._last_update_monotonic
 
     def jpeg(self) -> bytes | None:
         with self._lock:
