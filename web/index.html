@@ -237,6 +237,19 @@
     <button class="ask-dismiss" id="ask-dismiss" aria-label="Dismiss answer">&#x2715;</button>
   </div>
 
+  <button id="mute-btn" class="mute-btn" data-muted="false" aria-pressed="false" aria-label="Mute nudges during meetings">
+    <svg class="mute-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"
+         xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <path d="M10 2.5c-2.2 0-3.8 1.7-3.8 3.9 0 3.2-1.2 4.5-2 5.2-.3.3-.1.9.3.9h11c.4 0 .6-.6.3-.9-.8-.7-2-2-2-5.2 0-2.2-1.6-3.9-3.8-3.9Z"
+            stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M8.3 16.2c.4.7 1 1.1 1.7 1.1s1.3-.4 1.7-1.1"
+            stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <line class="mute-slash" x1="3" y1="3" x2="17" y2="17"
+            stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <span class="mute-label" id="mute-label">Mute</span>
+  </button>
+
   <button id="mic-btn" class="mic-btn" data-state="idle" aria-label="Ask Desk Sentinel">
     <svg class="mic-icon" width="20" height="20" viewBox="0 0 20 20" fill="none"
          xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

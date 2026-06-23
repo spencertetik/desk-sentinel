@@ -25,6 +25,9 @@ function connect() {
     h.textContent = d.healthy ? "live" : "stream down";
     h.className   = "badge " + (d.healthy ? "ok" : "bad");
 
+    // Mute button — reflect server-authoritative mute state + countdown
+    updateMute(d.muted, d.mute_remaining_s);
+
     // Activity chip — only meaningful when present
     const chip = $("activity-chip");
     if (chip) {
@@ -45,6 +48,54 @@ function connect() {
 }
 
 connect();
+
+// ── Mute button ─────────────────────────────────────────────────────────
+function fmtRemaining(s) {
+  if (!s || s <= 0) return "";
+  const m = Math.round(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  return `${h}h${String(m % 60).padStart(2, "0")}m`;
+}
+
+function updateMute(muted, remainingS) {
+  const btn = $("mute-btn");
+  const label = $("mute-label");
+  if (!btn || !label) return;
+  btn.dataset.muted = muted ? "true" : "false";
+  btn.setAttribute("aria-pressed", muted ? "true" : "false");
+  if (muted) {
+    const r = fmtRemaining(remainingS);
+    label.textContent = r ? `Muted · ${r}` : "Muted";
+    btn.setAttribute("aria-label", "Nudges muted — click to unmute");
+  } else {
+    label.textContent = "Mute";
+    btn.setAttribute("aria-label", "Mute nudges during meetings");
+  }
+}
+
+(function () {
+  const btn = $("mute-btn");
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    const muted = btn.dataset.muted === "true";
+    const endpoint = muted ? "/api/unmute" : "/api/mute";
+    // Optimistic flip for snappy feedback; the WebSocket reconciles shortly.
+    updateMute(!muted, muted ? 0 : 120 * 60);
+    try {
+      const r = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: muted ? null : JSON.stringify({ minutes: 120 }),
+      });
+      const d = await r.json();
+      updateMute(d.muted, d.mute_remaining_s);
+    } catch (e) {
+      // Revert on failure
+      updateMute(muted, 0);
+    }
+  });
+})();
 
 async function refreshHistory() {
   try {

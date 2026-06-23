@@ -44,6 +44,22 @@ def test_suppressed_outside_active_window():
     assert spoken == [] and notified == []
 
 
+def test_muted_suppresses_speech_and_notification():
+    n, spoken, notified = _nudger(is_muted=lambda: True)
+    fired = n.dispatch(Event("break_due", 0.0, "stand up"), _epoch_at_hour(10))
+    assert fired is False
+    assert spoken == [] and notified == []
+
+
+def test_unmuting_restores_nudges():
+    muted = {"on": True}
+    n, spoken, notified = _nudger(is_muted=lambda: muted["on"])
+    assert n.dispatch(Event("break_due", 0.0, "m"), _epoch_at_hour(10)) is False
+    muted["on"] = False
+    assert n.dispatch(Event("break_due", 0.0, "m"), _epoch_at_hour(10)) is True
+    assert spoken and notified
+
+
 def test_cooldown_suppresses_repeat():
     n, spoken, _ = _nudger()
     base = _epoch_at_hour(10)

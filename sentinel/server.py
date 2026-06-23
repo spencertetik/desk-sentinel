@@ -76,6 +76,28 @@ def create_app(
     def health():
         return state.snapshot()
 
+    @app.post("/api/mute")
+    async def mute(request: Request):
+        """Silence spoken nudges + notifications for a window (default 120 min).
+        Body: optional {"minutes": <int>}. Auto-expires so it can't stay on
+        forever."""
+        minutes = 120
+        try:
+            body = await request.json()
+            if isinstance(body, dict) and body.get("minutes") is not None:
+                minutes = max(1, int(body["minutes"]))
+        except Exception:
+            pass  # empty/invalid body -> default window
+        state.set_mute(minutes)
+        log.info("nudges muted for %d min via dashboard", minutes)
+        return state.snapshot()
+
+    @app.post("/api/unmute")
+    def unmute():
+        state.clear_mute()
+        log.info("nudges unmuted via dashboard")
+        return state.snapshot()
+
     @app.get("/frame.jpg")
     def frame():
         jpeg = state.jpeg()

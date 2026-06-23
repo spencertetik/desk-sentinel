@@ -60,6 +60,7 @@ class Nudger:
         speak_volume: int | None,
         speak_fn: Callable[[str, "int | None"], None] = speak_mac,
         notify_fn: Callable[[str, str], None] = notify_mac,
+        is_muted: Callable[[], bool] = lambda: False,
     ):
         self._start = work_start_hour
         self._end = work_end_hour
@@ -68,6 +69,7 @@ class Nudger:
         self._speak_volume = speak_volume
         self._speak = speak_fn
         self._notify = notify_fn
+        self._is_muted = is_muted
         self._last_fired: dict[str, float] = {}
 
     def _in_active_window(self, now: float) -> bool:
@@ -77,6 +79,11 @@ class Nudger:
 
     def dispatch(self, event, now: float) -> bool:
         if not event.message:
+            return False
+        # Muted (e.g. during a meeting): stay silent — no speech, no
+        # notification. The event is still logged by the caller, so history and
+        # analytics are unaffected; only the announcement is suppressed.
+        if self._is_muted():
             return False
         if not self._in_active_window(now):
             return False

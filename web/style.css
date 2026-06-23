@@ -841,6 +841,65 @@ h1 {
 /* ─────────────────────────────────────────────
    TALK BUTTON — floating mic (bottom-right)
    ───────────────────────────────────────────── */
+/* ── Mute (do-not-disturb) button — floats above the Ask button ── */
+.mute-btn {
+  position: fixed;
+  bottom: 96px;
+  right: 28px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: var(--r-pill);
+  background: var(--panel);
+  border: 1px solid var(--rim);
+  color: var(--muted);
+  cursor: pointer;
+  box-shadow: var(--shadow-md), var(--inner-hi);
+  transition:
+    background var(--t-fast) var(--ease),
+    border-color var(--t-fast) var(--ease),
+    box-shadow var(--t-fast) var(--ease),
+    transform var(--t-fast) var(--ease),
+    color var(--t-fast) var(--ease);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.mute-btn:hover {
+  background: var(--surface);
+  border-color: var(--rim-hi);
+  color: var(--text);
+  box-shadow: var(--shadow-lg), var(--inner-hi);
+}
+
+.mute-btn:active { transform: scale(0.95); }
+
+.mute-icon { flex-shrink: 0; }
+
+/* The diagonal slash only shows once nudges are actually muted. */
+.mute-slash {
+  opacity: 0;
+  transition: opacity var(--t-fast) var(--ease);
+}
+
+.mute-label {
+  font-size: var(--size-sm);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Active (muted) state — warm tint, mirrors the posture warn treatment. */
+.mute-btn[data-muted="true"] {
+  background: rgba(240, 144, 56, .12);
+  border-color: rgba(240, 144, 56, .38);
+  color: var(--warn);
+}
+
+.mute-btn[data-muted="true"] .mute-slash { opacity: 1; }
+
 .mic-btn {
   position: fixed;
   bottom: 28px;

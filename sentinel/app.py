@@ -380,6 +380,7 @@ def main():
         cooldown_seconds=cfg.nudges.cooldown_seconds,
         default_cooldown_seconds=cfg.nudges.default_cooldown_seconds,
         speak_volume=cfg.nudges.speak_volume,
+        is_muted=state.is_muted,
     ) if cfg.nudges.enabled else None
 
     worker = threading.Thread(

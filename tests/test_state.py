@@ -29,3 +29,27 @@ def test_snapshot_reflects_update():
     assert snap["posture"] == "good"
     assert snap["sitting_seconds"] == 42.0
     assert snap["healthy"] is True
+
+
+def test_mute_defaults_off():
+    st = SharedState()
+    assert st.is_muted() is False
+    assert st.snapshot()["muted"] is False
+
+
+def test_set_and_clear_mute():
+    st = SharedState()
+    st.set_mute(60)
+    assert st.is_muted() is True
+    snap = st.snapshot()
+    assert snap["muted"] is True
+    assert 3500 <= snap["mute_remaining_s"] <= 3600
+    st.clear_mute()
+    assert st.is_muted() is False
+    assert st.snapshot()["muted"] is False
+
+
+def test_zero_minute_mute_is_not_muted():
+    st = SharedState()
+    st.set_mute(0)
+    assert st.is_muted() is False
