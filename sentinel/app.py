@@ -360,7 +360,7 @@ def main():
             log.warning("Could not move legacy DB: %s", exc)
 
     store = Store(db_path)
-    state = SharedState()
+    state = SharedState(mute_state_path=os.path.join(db_dir, "mute_state.json"))
     stop = threading.Event()
 
     engine = EventEngine(

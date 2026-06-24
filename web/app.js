@@ -25,8 +25,8 @@ function connect() {
     h.textContent = d.healthy ? "live" : "stream down";
     h.className   = "badge " + (d.healthy ? "ok" : "bad");
 
-    // Mute button — reflect server-authoritative mute state + countdown
-    updateMute(d.muted, d.mute_remaining_s);
+    // Mute button — reflect server-authoritative mute state
+    updateMute(d.muted);
 
     // Activity chip — only meaningful when present
     const chip = $("activity-chip");
@@ -50,28 +50,17 @@ function connect() {
 connect();
 
 // ── Mute button ─────────────────────────────────────────────────────────
-function fmtRemaining(s) {
-  if (!s || s <= 0) return "";
-  const m = Math.round(s / 60);
-  if (m < 60) return `${m}m`;
-  const h = Math.floor(m / 60);
-  return `${h}h${String(m % 60).padStart(2, "0")}m`;
-}
-
-function updateMute(muted, remainingS) {
+function updateMute(muted) {
   const btn = $("mute-btn");
   const label = $("mute-label");
   if (!btn || !label) return;
   btn.dataset.muted = muted ? "true" : "false";
   btn.setAttribute("aria-pressed", muted ? "true" : "false");
-  if (muted) {
-    const r = fmtRemaining(remainingS);
-    label.textContent = r ? `Muted · ${r}` : "Muted";
-    btn.setAttribute("aria-label", "Nudges muted — click to unmute");
-  } else {
-    label.textContent = "Mute";
-    btn.setAttribute("aria-label", "Mute nudges during meetings");
-  }
+  label.textContent = muted ? "Muted" : "Mute";
+  btn.setAttribute(
+    "aria-label",
+    muted ? "Nudges muted — click to unmute" : "Mute nudges during meetings"
+  );
 }
 
 (function () {
@@ -80,19 +69,13 @@ function updateMute(muted, remainingS) {
   btn.addEventListener("click", async () => {
     const muted = btn.dataset.muted === "true";
     const endpoint = muted ? "/api/unmute" : "/api/mute";
-    // Optimistic flip for snappy feedback; the WebSocket reconciles shortly.
-    updateMute(!muted, muted ? 0 : 120 * 60);
+    updateMute(!muted); // optimistic; the WebSocket reconciles shortly
     try {
-      const r = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: muted ? null : JSON.stringify({ minutes: 120 }),
-      });
+      const r = await fetch(endpoint, { method: "POST" });
       const d = await r.json();
-      updateMute(d.muted, d.mute_remaining_s);
+      updateMute(d.muted);
     } catch (e) {
-      // Revert on failure
-      updateMute(muted, 0);
+      updateMute(muted); // revert on failure
     }
   });
 })();

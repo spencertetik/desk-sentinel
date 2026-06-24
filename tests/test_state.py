@@ -37,19 +37,28 @@ def test_mute_defaults_off():
     assert st.snapshot()["muted"] is False
 
 
-def test_set_and_clear_mute():
+def test_set_and_clear_mute_is_a_toggle():
     st = SharedState()
-    st.set_mute(60)
+    st.set_mute()
     assert st.is_muted() is True
-    snap = st.snapshot()
-    assert snap["muted"] is True
-    assert 3500 <= snap["mute_remaining_s"] <= 3600
+    assert st.snapshot()["muted"] is True
     st.clear_mute()
     assert st.is_muted() is False
     assert st.snapshot()["muted"] is False
 
 
-def test_zero_minute_mute_is_not_muted():
-    st = SharedState()
-    st.set_mute(0)
-    assert st.is_muted() is False
+def test_mute_persists_across_restart(tmp_path):
+    path = str(tmp_path / "mute_state.json")
+    st = SharedState(mute_state_path=path)
+    st.set_mute()
+    # A fresh instance (simulating an app restart) reads the persisted state.
+    st2 = SharedState(mute_state_path=path)
+    assert st2.is_muted() is True
+    st2.clear_mute()
+    assert SharedState(mute_state_path=path).is_muted() is False
+
+
+def test_corrupt_mute_file_defaults_unmuted(tmp_path):
+    path = tmp_path / "mute_state.json"
+    path.write_text("not json{{{")
+    assert SharedState(mute_state_path=str(path)).is_muted() is False

@@ -1,24 +1,31 @@
 from __future__ import annotations
 
+import json
+import logging
+import os
 import threading
 import time
 
 from sentinel.classify import Posture, Status
 
+log = logging.getLogger("desk_sentinel.state")
+
 
 class SharedState:
     """Thread-safe holder of the latest annotated JPEG + status + health."""
 
-    def __init__(self):
+    def __init__(self, mute_state_path: str | None = None):
         self._lock = threading.Lock()
         self._jpeg: bytes | None = None
         self._status = Status(Posture.AWAY, 0.0, 0.0, 0.0)
         self._healthy = False
         self._sitting_seconds = 0.0
-        # Mute: spoken nudges + notifications are suppressed while now <
-        # _mute_until. A finite window (set by the dashboard) auto-expires so a
-        # mute can never silently swallow nudges forever (e.g. after a meeting).
-        self._mute_until = 0.0
+        # Mute: a plain on/off switch. Spoken nudges + notifications are
+        # suppressed while muted, and it stays muted until explicitly turned
+        # back on. Persisted to disk so a restart (the watchdog can trigger one
+        # mid-meeting) never silently un-mutes.
+        self._mute_state_path = mute_state_path
+        self._muted = self._load_mute()
         # Heartbeat: bumped every processing-loop iteration. The watchdog uses
         # loop_age() to detect a wedged loop (the loop can stall even while the
         # capture thread keeps producing fresh frames, so capture freshness
@@ -39,22 +46,40 @@ class SharedState:
             return time.monotonic() - self._last_update_monotonic
 
     # ── Mute (do-not-disturb) ─────────────────────────────────────────────
-    def set_mute(self, minutes: float) -> None:
-        """Silence nudges for *minutes* (auto-expires)."""
+    def _load_mute(self) -> bool:
+        if not self._mute_state_path:
+            return False
+        try:
+            if os.path.exists(self._mute_state_path):
+                with open(self._mute_state_path) as f:
+                    return bool(json.load(f).get("muted", False))
+        except Exception as exc:  # corrupt/unreadable -> default unmuted
+            log.warning("could not read mute state: %s", exc)
+        return False
+
+    def _persist_mute(self) -> None:
+        if not self._mute_state_path:
+            return
+        try:
+            with open(self._mute_state_path, "w") as f:
+                json.dump({"muted": self._muted}, f)
+        except Exception as exc:  # non-fatal
+            log.warning("could not persist mute state: %s", exc)
+
+    def set_mute(self) -> None:
+        """Mute nudges until explicitly unmuted (persists across restarts)."""
         with self._lock:
-            self._mute_until = time.time() + max(0.0, minutes) * 60.0
+            self._muted = True
+            self._persist_mute()
 
     def clear_mute(self) -> None:
         with self._lock:
-            self._mute_until = 0.0
+            self._muted = False
+            self._persist_mute()
 
     def is_muted(self) -> bool:
         with self._lock:
-            return time.time() < self._mute_until
-
-    def mute_remaining(self) -> float:
-        with self._lock:
-            return max(0.0, self._mute_until - time.time())
+            return self._muted
 
     def jpeg(self) -> bytes | None:
         with self._lock:
@@ -71,6 +96,5 @@ class SharedState:
                 "healthy": self._healthy,
                 "sitting_seconds": round(self._sitting_seconds, 0),
                 "active": self._status.active,
-                "muted": time.time() < self._mute_until,
-                "mute_remaining_s": int(max(0.0, self._mute_until - time.time())),
+                "muted": self._muted,
             }

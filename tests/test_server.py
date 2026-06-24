@@ -28,24 +28,14 @@ def test_mute_and_unmute_endpoints():
 
     assert client.get("/api/health").json()["muted"] is False
 
-    r = client.post("/api/mute", json={"minutes": 30})
+    r = client.post("/api/mute")
     assert r.status_code == 200
-    body = r.json()
-    assert body["muted"] is True
-    assert 1700 <= body["mute_remaining_s"] <= 1800
-    assert state.is_muted() is True
+    assert r.json()["muted"] is True
+    assert state.is_muted() is True  # stays muted, no timer
 
     r = client.post("/api/unmute")
     assert r.json()["muted"] is False
     assert state.is_muted() is False
-
-
-def test_mute_defaults_to_120_min_on_empty_body():
-    state = _state_with_data()
-    client = TestClient(create_app(state, static_dir=None))
-    body = client.post("/api/mute").json()
-    assert body["muted"] is True
-    assert 7000 <= body["mute_remaining_s"] <= 7200
 
 
 def test_stream_returns_multipart():
