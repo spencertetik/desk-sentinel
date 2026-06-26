@@ -89,6 +89,14 @@ class PresenceConfig(BaseModel):
     # Manual override of the seat zone (normalized [x0, y0, x1, y1]). When null,
     # the zone learned during `--calibrate` (stored in baseline.json) is used.
     seat_roi: list[float] | None = None
+    # Liveness gate: a detected body only counts as present if its pose actually
+    # moves over time. Rejects frozen detections on static furniture (an empty
+    # chair the pose model hallucinates a slouched person onto). A real person
+    # is never motionless this long; furniture always is.
+    liveness_enabled: bool = True
+    liveness_window_s: float = 120.0     # look-back window for movement
+    liveness_move_delta: float = 0.06    # required range of motion (normalized) in the window
+    liveness_teleport: float = 0.15      # a jump this big = subject switched, restart the proof
 
 
 class VoiceConfig(BaseModel):

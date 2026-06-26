@@ -25,6 +25,7 @@ from sentinel.classify import Posture, Status, classify
 from sentinel.config import load_config
 from sentinel.events import Event, EventEngine
 from sentinel.feedback import compose_status_message
+from sentinel.liveness import PresenceLiveness
 from sentinel.metrics import compute_posture, RawPosture
 from sentinel.nudges import Nudger
 from sentinel.overlay import draw_overlay
@@ -157,6 +158,19 @@ def processing_loop(cap, pose, store, state, cfg, stop: threading.Event, engine,
         )
     _prev_present = None
 
+    # ── Liveness gate (reject frozen furniture detections) ────────────────
+    liveness = None
+    if cfg.presence.liveness_enabled:
+        liveness = PresenceLiveness(
+            window_s=cfg.presence.liveness_window_s,
+            move_delta=cfg.presence.liveness_move_delta,
+            teleport=cfg.presence.liveness_teleport,
+        )
+        log.info(
+            "Presence liveness gate active (window=%.0fs, move_delta=%.3f)",
+            cfg.presence.liveness_window_s, cfg.presence.liveness_move_delta,
+        )
+
     # ── Activity detection state ──────────────────────────────────────────
     # prev_roi_gray: grayscale crop of the ORIGINAL frame (not pose-downscaled)
     # so that ROI pixel coordinates are consistent with cfg.activity.roi.
@@ -192,8 +206,22 @@ def processing_loop(cap, pose, store, state, cfg, stop: threading.Event, engine,
         else:
             pose_frame = frame
 
+        now = time.time()
+
         lms = pose.estimate(pose_frame)
         raw = compute_posture(lms, cfg.thresholds.min_visibility, seat_roi=seat_roi) if lms else _absent()
+
+        # Liveness gate: a present pose only counts if it actually moves over
+        # time. A frozen detection is static furniture (an empty chair the model
+        # hallucinates a person onto), not a person — drop it to absent.
+        if liveness is not None:
+            alive = liveness.update(raw.present, raw.shoulder_x, raw.shoulder_y, now)
+            if raw.present and not alive:
+                if _prev_present:  # log the suppression once, on the edge
+                    log.info("presence -> absent (liveness: frozen pose at x=%.2f y=%.2f)",
+                             raw.shoulder_x, raw.shoulder_y)
+                raw = _absent()
+
         status = classify(raw, baseline, cfg.thresholds)
 
         # Log presence transitions (low-volume) so the gate is auditable: when
@@ -205,7 +233,6 @@ def processing_loop(cap, pose, store, state, cfg, stop: threading.Event, engine,
             )
             _prev_present = raw.present
 
-        now = time.time()
         sit_start, sitting = advance_sit_timer(sit_start, status.posture, now)
 
         # ── Activity detection ────────────────────────────────────────────
